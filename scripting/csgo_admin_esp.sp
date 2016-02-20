@@ -1,11 +1,11 @@
 /**
-* CS:GO Admin ESP by Root
+* CS:GO Admin ESP by Root & Mitch
 *
 * Description:
 *   Plugin show positions of all players through walls to admin when he/she is observing, dead or spectate.
 *
-* Version 2.1
-* Changelog & more info at http://goo.gl/4nKhJ
+* Version 2.2
+* Added bot_takeover event, and allowed bots to have wallhack glows. (Also fixed the WildFire update)
 */
 
 // ====[ INCLUDES ]=======================================================================
@@ -17,7 +17,7 @@
 
 // ====[ CONSTANTS ]======================================================================
 #define PLUGIN_NAME    "CS:GO Admin ESP"
-#define PLUGIN_VERSION "2.1"
+#define PLUGIN_VERSION "2.2"
 
 // ====[ VARIABLES ]======================================================================
 new	Handle:AdminESP,
@@ -34,7 +34,7 @@ new	Handle:AdminESP,
 public Plugin:myinfo =
 {
 	name        = PLUGIN_NAME,
-	author      = "Root",
+	author      = "Root, Mitch",
 	description = "ESP/WH for Admins",
 	version     = PLUGIN_VERSION,
 	url         = "forums.alliedmods.net/showthread.php?p=211117"
@@ -93,12 +93,14 @@ public OnConVarChange(Handle:convar, const String:oldValue[], const String:newVa
 			UnhookEvent("player_spawn", OnPlayerEvents, EventHookMode_Post);
 			UnhookEvent("player_death", OnPlayerEvents, EventHookMode_Post);
 			UnhookEvent("player_team",  OnPlayerEvents, EventHookMode_Post);
+			UnhookEvent("bot_takeover",  BotTakeOverEvent, EventHookMode_Pre);
 		}
 		case true:
 		{
 			HookEvent("player_spawn", OnPlayerEvents, EventHookMode_Post);
 			HookEvent("player_death", OnPlayerEvents, EventHookMode_Post);
 			HookEvent("player_team",  OnPlayerEvents, EventHookMode_Post);
+			HookEvent("bot_takeover",  BotTakeOverEvent, EventHookMode_Pre);
 		}
 	}
 }
@@ -145,6 +147,22 @@ public OnPlayerEvents(Handle:event, const String:name[], bool:dontBroadcast)
 	}
 }
 
+/* BotTakeOverEvent()
+ *
+ * Called when ever a bot is being taken
+ * --------------------------------------------------------------------------------------- */
+public BotTakeOverEvent(Handle:event, const String:name[], bool:dontBroadcast)
+{
+#if defined _CustomPlayerSkins_included
+	CPS_RemoveSkin(GetClientOfUserId(GetEventInt(event, "botid")));
+	if (GetConVarBool(AdminESP_Mode))
+	{
+		// Attach custom player model and enable glow after 0.1 delay on respawning
+		CreateTimer(0.1, Timer_SetupGlow, GetEventInt(event, "userid"), TIMER_FLAG_NO_MAPCHANGE);
+	}
+#endif
+}
+
 /* Command_ToggleESP()
  *
  * Command to enable/disable ESP for single Admin.
@@ -178,11 +196,8 @@ public Action:Timer_SetupGlow(Handle:timer, any:client)
 		GetClientModel(client, model, sizeof(model));
 
 		// Remove old custom skin and create a new one with same model as player
-		CPS_RemoveSkin(client); // Does not make the model invisible. (useful for glows) (c) CustomPlayerSkins.inc file
-		CPS_SetSkin(client, model, CPS_RENDER);
-
-		// Retrieve skin entity from core plugin
-		new skin = CPS_GetSkin(client);
+		//CPS_RemoveSkin(client); // Does not make the model invisible. (useful for glows) (c) CustomPlayerSkins.inc file
+		new skin = CPS_SetSkin(client, model, CPS_RENDER);
 
 		// Validate skin entity by SDKHookEx native return
 		if (SDKHookEx(skin, SDKHook_SetTransmit, OnSetTransmit))
@@ -234,6 +249,9 @@ SetupGlow(entity, r, g, b, a)
 
 	// Enable glow for custom skin
 	SetEntProp(entity, Prop_Send, "m_bShouldGlow", true, true);
+	SetEntProp(entity, Prop_Send, "m_nGlowStyle", 0);
+	SetEntPropFloat(entity, Prop_Send, "m_flGlowMaxDist", 10000000.0);
+	
 
 	// So now setup given glow colors for the skin
 	SetEntData(entity, offset, r, _, true);    // Red
@@ -266,5 +284,5 @@ ToggleAdminESP(client, bool:value)
 bool:IsValidClient(client)
 {
 	// Bots should be ignored (because their glow skin won't be removed after controlling)
-	return (1 <= client <= MaxClients && IsClientInGame(client) && !IsFakeClient(client)) ? true : false;
+	return (1 <= client <= MaxClients && IsClientInGame(client)) ? true : false;
 }
