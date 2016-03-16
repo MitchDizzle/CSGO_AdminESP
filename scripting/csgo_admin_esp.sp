@@ -4,8 +4,8 @@
 * Description:
 *   Plugin show positions of all players through walls to admin when he/she is observing, dead or spectate.
 *
-* Version 2.2
-* Added bot_takeover event, and allowed bots to have wallhack glows. (Also fixed the WildFire update)
+* Version 2.2.1
+* Removed bot events
 */
 
 // ====[ INCLUDES ]=======================================================================
@@ -17,7 +17,7 @@
 
 // ====[ CONSTANTS ]======================================================================
 #define PLUGIN_NAME    "CS:GO Admin ESP"
-#define PLUGIN_VERSION "2.2"
+#define PLUGIN_VERSION "2.2.1"
 
 // ====[ VARIABLES ]======================================================================
 new	Handle:AdminESP,
@@ -93,14 +93,12 @@ public OnConVarChange(Handle:convar, const String:oldValue[], const String:newVa
 			UnhookEvent("player_spawn", OnPlayerEvents, EventHookMode_Post);
 			UnhookEvent("player_death", OnPlayerEvents, EventHookMode_Post);
 			UnhookEvent("player_team",  OnPlayerEvents, EventHookMode_Post);
-			UnhookEvent("bot_takeover",  BotTakeOverEvent, EventHookMode_Pre);
 		}
 		case true:
 		{
 			HookEvent("player_spawn", OnPlayerEvents, EventHookMode_Post);
 			HookEvent("player_death", OnPlayerEvents, EventHookMode_Post);
 			HookEvent("player_team",  OnPlayerEvents, EventHookMode_Post);
-			HookEvent("bot_takeover",  BotTakeOverEvent, EventHookMode_Pre);
 		}
 	}
 }
@@ -145,22 +143,6 @@ public OnPlayerEvents(Handle:event, const String:name[], bool:dontBroadcast)
 			ToggleAdminESP(client, true);
 		}
 	}
-}
-
-/* BotTakeOverEvent()
- *
- * Called when ever a bot is being taken
- * --------------------------------------------------------------------------------------- */
-public BotTakeOverEvent(Handle:event, const String:name[], bool:dontBroadcast)
-{
-#if defined _CustomPlayerSkins_included
-	CPS_RemoveSkin(GetClientOfUserId(GetEventInt(event, "botid")));
-	if (GetConVarBool(AdminESP_Mode))
-	{
-		// Attach custom player model and enable glow after 0.1 delay on respawning
-		CreateTimer(0.1, Timer_SetupGlow, GetEventInt(event, "userid"), TIMER_FLAG_NO_MAPCHANGE);
-	}
-#endif
 }
 
 /* Command_ToggleESP()
@@ -284,5 +266,5 @@ ToggleAdminESP(client, bool:value)
 bool:IsValidClient(client)
 {
 	// Bots should be ignored (because their glow skin won't be removed after controlling)
-	return (1 <= client <= MaxClients && IsClientInGame(client)) ? true : false;
+	return (1 <= client <= MaxClients && IsClientInGame(client) && !IsFakeClient(client)) ? true : false;
 }
